@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+body {
+    padding: 0;
+    margin: 0;
+    font-family: sans-serif;
+}
+
+.node circle {
+    fill: #999;
+}
+
+.node text {
+    font: 10px sans-serif;
+}
+
+.node--internal circle {
+    fill: #555;
+}
+
+.node--internal text {
+    text-shadow: 0 1px 0 #fff, 0 -1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff;
+}
+
+.link {
+    fill: none;
+    stroke: #555;
+    stroke-opacity: 0.4;
+    stroke-width: 1.5px;
+}
+
+g.slider {
+    display: none;
+}
+
+.ticks {
+    font: 10px sans-serif;
+}
+
+.track,
+.track-inset,
+.track-overlay {
+    stroke-linecap: round;
+}
+
+.track {
+    stroke: #000;
+    stroke-opacity: 0.3;
+    stroke-width: 10px;
+}
+
+.track-inset {
+    stroke: #ddd;
+    stroke-width: 8px;
+}
+
+.track-overlay {
+    pointer-events: stroke;
+    stroke-width: 50px;
+    stroke: transparent;
+    cursor: crosshair;
+}
+
+.handle {
+    fill: #fff;
+    stroke: #000;
+    stroke-opacity: 0.5;
+    stroke-width: 1.25px;
+}
+</style>
+<svg width="1024" height="768"></svg>
+<script src="//d3js.org/d3.v5.min.js"></script>
+<script src="http://cdn.date-fns.org/v1.0.0/date_fns.min.js"></script>
+<script>
+var svg = d3.select("svg")
+
+svg.attr("width", window.innerWidth)
+svg.attr("height", window.innerHeight)
+
+var width = +svg.attr("width"),
+    height = +svg.attr("height"),
+    g = svg.append("g").attr("transform", "translate(40,0)")
+margin = {
+    left: 20,
+    right: 20,
+    bottom: 20,
+    top: 40
+};
+
+var closestTo = dateFns.closestTo
+
+var link = g.selectAll(".link")
+var node = g.selectAll(".node")
+var label = g.selectAll(".label")
+
+var slider = svg.append("g")
+    .attr("class", "slider")
+    .attr("transform", "translate(" + margin.left + "," + (margin.top) + ")");
+
+var pageTitle = svg.append('text')
+    .text('Metapedia, Race and intelligence TOC')
+    .attr('x', 20)
+    .attr('y', margin.top/2)
+
+var date = svg.append('text')
+    .text('date')
+    .attr('x', 20)
+    .attr('y', margin.top)
+
+var tree = d3.tree()
+    .size([height - margin.top - margin.bottom, width - 500]);
+
+var stratify = d3.stratify()
+    .parentId(function(d) { return d.id.substring(0, d.id.lastIndexOf(".")); });
+
+var ageColor = d3.scaleLinear()
+    .range(['#D35400', '#34495E'])
+    .domain([0, 1])
+    .clamp(true);
+
+var parseDate = d3.timeParse("%d/%m/%YT%H:%M:%SZ");
+
+d3.tsv("toc-metapedia.csv").then(function(data) {
+
+    data.forEach(d => {
+        d.id = d.number;
+        let thisDate = d.date + "T" + d.time
+        d.timeStamp = parseDate(thisDate)
+    })
+
+    let allTimestapms = data.map(d => { return d.timeStamp })
+
+    var x = d3.scaleTime()
+        .domain(d3.extent(allTimestapms))
+        .range([margin.left, width - margin.left - margin.right])
+        .clamp(true);
+
+    data = d3.nest()
+        .key(function(d) { return d.timeStamp })
+        .entries(data)
+
+    // console.log(data)
+
+    // slider
+
+    slider.append("line")
+        .attr("class", "track")
+        .attr("x1", x.range()[0])
+        .attr("x2", x.range()[1])
+        .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+        .attr("class", "track-inset")
+        .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+        .attr("class", "track-overlay")
+        .call(d3.drag()
+            .on("start.interrupt", function() { slider.interrupt(); })
+            .on("start drag", function() {
+                let matchingDate = closestTo(Date.parse(x.invert(d3.event.x)), allTimestapms.map(d => { return Date.parse(d) }))
+                let selectedRev = data.filter(function(d) {
+                    return d.key == matchingDate.toString();
+                })
+                update(selectedRev[0].values, x.invert(d3.event.x))
+            }));
+
+    slider.insert("g", ".track-overlay")
+        .attr("class", "ticks")
+        .attr("transform", "translate(0," + 18 + ")")
+        .selectAll("text")
+        .data(x.ticks(2))
+        .enter().append("text")
+        .attr("x", x)
+        .attr("text-anchor", "middle")
+        .text(function(d) { return d + "°"; });
+
+    var handle = slider.insert("circle", ".track-overlay")
+        .attr("class", "handle")
+        .attr("r", 9);
+
+    var selectedDate = slider.insert("text", ".Xtrack-overlay")
+        .attr("class", "handle text")
+        .attr("text-anchor", "middle")
+        .attr("y", -10)
+        .text('date');
+
+    // Format Data 
+
+    data.forEach(d => {
+
+        d.values.forEach(value => {
+            value.number = '0.' + value.number
+            value.id = '0.' + value.id
+            value.age = 0;
+        })
+
+        let obj = {
+            anchor: "root",
+            byteoffset: "0",
+            date: d.values[0].date,
+            fromtitle: "Race_and_intelligence",
+            id: "0",
+            index: "0",
+            level: "1",
+            line: "Race and intelligence",
+            number: "0",
+            revid: d.values[0].revid,
+            timeStamp: d.values[0].timeStamp,
+            time: "16:10:01Z",
+            toclevel: "0",
+            age: 0
+        }
+
+        d.values.unshift(obj);
+
+
+    })
+
+    let interval = 500;
+    let counter = data.length;
+    window.setInterval(function() {
+        counter -= 1;
+        if (counter >= 0) {
+            update(data[counter].values);
+        } else {
+            counter = data.length;
+        }
+    }, interval);
+
+    // let firstDate = "Wed Jul 25 2007 12:36:21 GMT+0200 (Central European Summer Time)"
+
+    // update(data[10].values)
+
+    function update(data, handleDate) {
+
+        if (handleDate) {
+            handle.attr("cx", x(handleDate));
+            selectedDate
+                .attr("x", x(handleDate))
+                .text(handleDate.toLocaleDateString())
+        }
+
+        var root = stratify(data)
+            .sort(function(a, b) {
+                // console.log(a,b)
+                return (a.id - b.id) || a.id.localeCompare(b.id);
+                return (a.height - b.height) || a.id.localeCompare(b.id);
+            });
+
+        tree(root);
+
+        let anim_duration = interval-200;
+
+        date.text(`Date: ${data[1].date} (${data[1].revid})`)
+
+        link = link.data(root.descendants().slice(1))
+        link.exit().remove()
+
+        link = link.enter().append("path")
+            .attr("class", "link")
+            .merge(link)
+
+        link.transition().duration(anim_duration)
+            .attr("d", function(d) {
+                return "M" + d.y + "," + d.x +
+                    "C" + (d.parent.y + 100) + "," + d.x +
+                    " " + (d.parent.y + 100) + "," + d.parent.x +
+                    " " + d.parent.y + "," + d.parent.x;
+            });
+
+        node.each(function(d) {
+            let currentAge = d3.select(this).attr('age') * 1;
+            currentAge += 0.05;
+            currentAge = d3.select(this).attr('age', currentAge)
+        })
+
+        node = node.data(root.descendants(), function(d) {
+            return d.data.id + '-' + d.data.line
+        })
+
+        node.exit().remove()
+
+
+        node = node.enter().append("circle")
+            .attr("class", function(d) { return "node" + (d.children ? " node--internal" : " node--leaf"); })
+            .attr('cx', function(d) { return d.y * 1.5 })
+            .attr('cy', function(d) { return d.x })
+            .attr('r', 5)
+            .attr('age', 0)
+            .merge(node)
+            .attr('fill', function(d) {
+                let currentAge = d3.select(this).attr('age') * 1
+                return ageColor(currentAge >= 1 ? 1 : currentAge)
+            })
+
+        node
+            .transition().duration(anim_duration)
+            .attr('cx', function(d) { return d.y })
+            .attr('cy', function(d) { return d.x })
+
+        label.each(function(d) {
+            let currentAge = d3.select(this).attr('age') * 1;
+            currentAge += 0.05;
+            currentAge = d3.select(this).attr('age', currentAge)
+        })
+
+        label = label.data(root.descendants(), function(d) {
+            return d.data.id + '-' + d.data.line
+        })
+
+        label.exit().remove()
+
+        label = label.enter().append("text")
+            .attr("class", function(d) { return "label" + (d.children ? " label--internal" : " label--leaf"); })
+            .attr('x', function(d) { return d.y*1.5 })
+            .attr('y', function(d) { return d.x + 5 })
+            .merge(label)
+            .text(function(d) { return d.id.replace('0.','').replace('0','') + ' ' + d.data.line })
+            .attr('fill', function(d) {
+                let currentAge = d3.select(this).attr('age') * 1
+                return ageColor(currentAge >= 1 ? 1 : currentAge)
+            })
+
+
+        label
+            .transition().duration(anim_duration)
+            .style('opacity', 1)
+            .attr('x', function(d) { return d.y + 7 })
+            .attr('y', function(d) { return d.x + 5 })
+
+    }
+
+
+});
+</script>
