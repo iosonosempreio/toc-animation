@@ -25,7 +25,7 @@ body {
 
 .link {
     fill: none;
-    stroke: #555;
+    stroke: #999;
     stroke-opacity: 0.4;
     stroke-width: 1.5px;
 }
@@ -121,7 +121,7 @@ var ageColor = d3.scaleLinear()
 
 var parseDate = d3.timeParse("%d/%m/%YT%H:%M:%SZ");
 
-d3.tsv("toc-metapedia.csv").then(function(data) {
+d3.tsv("toc-metapedia.tsv").then(function(data) {
 
     data.forEach(d => {
         d.id = d.number;
@@ -214,7 +214,7 @@ d3.tsv("toc-metapedia.csv").then(function(data) {
 
     })
 
-    let interval = 500;
+    let interval = 250;
     let counter = data.length;
     window.setInterval(function() {
         counter -= 1;
@@ -247,7 +247,7 @@ d3.tsv("toc-metapedia.csv").then(function(data) {
 
         tree(root);
 
-        let anim_duration = interval-200;
+        let anim_duration = interval*0.75;
 
         date.text(`Date: ${data[1].date} (${data[1].revid})`)
 
