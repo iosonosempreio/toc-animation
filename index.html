@@ -25,17 +25,21 @@
 }
 </style>
 <svg width="1024" height="768"></svg>
-<script src="//d3js.org/d3.v4.min.js"></script>
+<script src="//d3js.org/d3.v5.min.js"></script>
 <script>
 var svg = d3.select("svg"),
     width = +svg.attr("width"),
     height = +svg.attr("height"),
     g = svg.append("g").attr("transform", "translate(40,0)");
 
+var link = g.selectAll(".link")
+var node = g.selectAll(".node")
+var label = g.selectAll(".label")
+
 var date = svg.append('text')
     .text('date')
     .attr('x', 20)
-    .attr('y',30)
+    .attr('y', 30)
 
 var tree = d3.cluster()
     .size([height, width - 250]);
@@ -43,8 +47,13 @@ var tree = d3.cluster()
 var stratify = d3.stratify()
     .parentId(function(d) { return d.id.substring(0, d.id.lastIndexOf(".")); });
 
-d3.tsv("toc-complete.csv", function(error, data) {
-    if (error) throw error;
+var ageColor = d3.scaleLinear()
+    .range(['#E74C3C','#34495E'])
+    .domain([0,1])
+
+console.log(ageColor(0.5))
+
+d3.tsv("toc-complete.csv").then(function(data) {
 
     data.forEach(d => {
         d.id = d.number;
@@ -61,6 +70,7 @@ d3.tsv("toc-complete.csv", function(error, data) {
         d.values.forEach(value => {
             value.number = '0.' + value.number
             value.id = '0.' + value.id
+            value.age = 0;
         })
 
         let obj = {
@@ -75,7 +85,8 @@ d3.tsv("toc-complete.csv", function(error, data) {
             number: "0",
             revid: d.values[0].revid,
             time: "16:10:01Z",
-            toclevel: "0"
+            toclevel: "0",
+            age: 0
         }
 
         d.values.unshift(obj);
@@ -83,30 +94,18 @@ d3.tsv("toc-complete.csv", function(error, data) {
 
     })
 
-    // console.log(data.slice(0, 1)[0].values)
-
-
     let counter = data.length;
     window.setInterval(function() {
-        // console.log('update')
         counter -= 1;
 
         if (counter >= 0) {
-          
-          update(data[counter].values);
+
+            update(data[counter].values);
         } else {
-          counter = data.length;
+            counter = data.length;
         }
-        
-    }, 750);
 
-    // console.log(data.length)
-
-    // update(data[0].values);
-
-    var link = g.selectAll(".link")
-    var node = g.selectAll(".node")
-    var label = g.selectAll(".label")
+    }, 250);
 
     function update(data) {
         console.log(data[0].date);
@@ -116,7 +115,7 @@ d3.tsv("toc-complete.csv", function(error, data) {
 
         tree(root);
 
-        let anim_duration = 400;
+        let anim_duration = 50;
 
         date.text(data[0].date)
 
@@ -135,66 +134,66 @@ d3.tsv("toc-complete.csv", function(error, data) {
                     " " + d.parent.y + "," + d.parent.x;
             });
 
-        node = node.data(root.descendants(), function(d){
-          // console.log(d.data.id + '-' + d.data.line)
-          return d.data.id + '-' + d.data.line
+        node.each( function(d){
+            let currentAge = d3.select(this).attr('age')*1;
+            currentAge +=0.05;
+            currentAge = d3.select(this).attr('age', currentAge)
+        })
+
+        node = node.data(root.descendants(), function(d) {
+            return d.data.id + '-' + d.data.line
         })
 
         node.exit().remove()
 
-        // node = node.enter().append("g")
-        //     .attr("class", function(d) { return "node" + (d.children ? " node--internal" : " node--leaf"); })
-        //     .attr("transform", function(d) { return "translate(" + d.y + "," + d.x + ")"; })
-        //     .merge(node)
-
-        // node.append("circle")
-        //     .attr("r", 2.5);
 
         node = node.enter().append("circle")
             .attr("class", function(d) { return "node" + (d.children ? " node--internal" : " node--leaf"); })
-            .attr('cx', function(d){ return d.y*1.5})
-            .attr('cy', function(d){ return d.x})
-            .attr('r',2.5)
+            .attr('cx', function(d) { return d.y * 1.5 })
+            .attr('cy', function(d) { return d.x })
+            .attr('r', 5)
+            .attr('age', 0)
             .merge(node)
+            .attr('fill', function(d) {
+                let currentAge = d3.select(this).attr('age')*1
+                return ageColor(currentAge >= 1 ? 1 : currentAge)
+            })
 
         node
             .transition().duration(anim_duration)
-            .attr('cx', function(d){ return d.y})
-            .attr('cy', function(d){ return d.x})
-            // .attr("transform", function(d) { return "translate(" + d.y + "," + d.x + ")"; })
+            .attr('cx', function(d) { return d.y })
+            .attr('cy', function(d) { return d.x })
 
-        label = label.data(root.descendants(), function(d){
-          // console.log(d.data.id + '-' + d.data.line)
-          return d.data.id + '-' + d.data.line
+        label.each( function(d){
+            let currentAge = d3.select(this).attr('age')*1;
+            currentAge +=0.05;
+            currentAge = d3.select(this).attr('age', currentAge)
+        })
+
+        label = label.data(root.descendants(), function(d) {
+            return d.data.id + '-' + d.data.line
         })
 
         label.exit().remove()
 
-        label.style('fill','black')
-
         label = label.enter().append("text")
             .attr("class", function(d) { return "label" + (d.children ? " label--internal" : " label--leaf"); })
-            .style('fill','red')
-            // .style('opacity',0)
-            .attr('x', function(d){ return d.y})
-            .attr('y', function(d){ return d.x})
+            .attr('x', function(d) { return d.y })
+            .attr('y', function(d) { return d.x })
             .merge(label)
-            .text(function(d){return d.data.line})
-                        
+            .text(function(d) { return d.data.line })
+            .attr('fill', function(d) {
+                let currentAge = d3.select(this).attr('age')*1
+                return ageColor(currentAge >= 1 ? 1 : currentAge)
+            })
+            
 
         label
             .transition().duration(anim_duration)
-            .style('opacity',1)
-            // .style('fill','black')
-            .attr('y', function(d){ return d.x})
-            .attr('x', function(d){ return d.y})
+            .style('opacity', 1)
+            .attr('y', function(d) { return d.x })
+            .attr('x', function(d) { return d.y })
 
-
-        // node.append("text")
-        //     .attr("dy", 3)
-        //     .attr("x", function(d) { return d.children ? -8 : 8; })
-        //     .style("text-anchor", function(d) { return d.children ? "end" : "start"; })
-        //     .text(function(d) { return d.data.line; return d.id.substring(d.id.lastIndexOf(".") + 1); });
     }
 
 
